@@ -1,5 +1,6 @@
 import argparse
 import dotenv
+import jinja2
 import os
 import pandas
 
@@ -30,6 +31,22 @@ def get_input_texts(args):
                 result[key] = row[key]
             yield result
 
+def get_prompt(args):
+    ''' Get prompt template for query '''
+    if args.prompt_text is not None:
+        return args.prompt_text
+    if args.prompt_file is not None:
+        with open(args.prompt_file, 'rt') as fin:
+            contents = fin.read()
+            return contents
+
+env = jinja2.Environment()
+
+def fill_prompt(prompt, values):
+    ''' Fill in prompt template with values '''
+    template = env.from_string(prompt)
+    return template.render(values)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--openai_api_key', metavar='KEY', help='You API key for OpenAI. Can also be set with environment variable OPENAI_API_KEY.')
@@ -37,6 +54,8 @@ def main():
     parser.add_argument('--input_text', metavar='TEXT', nargs='*', help='Direct text(s) to treat as an input (will use template key "input")')
     parser.add_argument('--input_filename', metavar='FILE', nargs='*', help='Filename(s) for text to treat as an input (will use template key "input")')
     parser.add_argument('--input_parquet', metavar='FILE', help='Parquet file to use for reading input (template keys are column names)')
+    parser.add_argument('--prompt_text', metavar='TEXT', help='Prompt text to use for query (Jinja2 syntax)')
+    parser.add_argument('--prompt_file', metavar='FILE', help='Prompt file to use for query (Jinja2 syntax)')
     args = parser.parse_args()
     if args.openai_api_key is None:
         args.openai_api_key = os.getenv('OPENAI_API_KEY')
@@ -48,10 +67,11 @@ def main():
     formats += 1 if args.input_parquet is not None else 0
     if formats != 1:
         raise RuntimeError('Must specify exactly 1 input format out of --input_text, --input_filename, --input_parquet')
-    print(args)
     count = 0
-    for text in get_input_texts(args):
-        print(f'input: {count}\n{text}')
+    prompt = get_prompt(args)
+    for values in get_input_texts(args):
+        query = fill_prompt(prompt, values)
+        print(f'input: {count}\n{query}')
         count += 1
 
 if __name__ == '__main__':
