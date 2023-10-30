@@ -1,6 +1,7 @@
 import argparse
 import dotenv
 import jinja2
+import openai
 import os
 import pandas
 
@@ -61,6 +62,7 @@ def main():
         args.openai_api_key = os.getenv('OPENAI_API_KEY')
     if args.togetherai_api_key is None:
         args.togetherai_api_key = os.getenv('TOGETHERAI_API_KEY')
+    openai.api_key = args.openai_api_key
     formats = 0
     formats += 1 if args.input_text is not None else 0
     formats += 1 if args.input_filename is not None else 0
@@ -72,6 +74,12 @@ def main():
     for values in get_input_texts(args):
         query = fill_prompt(prompt, values)
         print(f'input: {count}\n{query}')
+        if count < 3:
+            completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": query}])
+            answer = completion.choices[0].message.content
+            print(f'answer:\n{answer}')
+        else:
+            break
         count += 1
 
 if __name__ == '__main__':
